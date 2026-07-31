@@ -1,6 +1,7 @@
 import { Context, h, MessageEncoder } from 'koishi'
 import { MilkyBot } from './bot'
-import { OutgoingSegment } from '@saltify/milky-types'
+import { OutgoingSegment } from './generated/schema'
+import { decodeMessageId, encodeMessageIdByScene, getSceneAndPeerId } from './utils'
 
 interface Author {
   id?: string
@@ -58,18 +59,17 @@ export class MilkyMessageEncoder<C extends Context = Context> extends MessageEnc
       return
     }
 
-    let resp: { message_seq: number, time: number }
-    if (this.channelId.startsWith('private:')) {
-      const userId = +this.channelId.replace('private:', '')
-      resp = await this.bot.internal.sendPrivateMessage(userId, this.segments)
-    } else if (this.channelId.startsWith('temporary:')) {
-      const userId = +this.channelId.replace('temporary:', '')
-      resp = await this.bot.internal.sendPrivateMessage(userId, this.segments)
+    let resp
+    const [scene, peerId] = getSceneAndPeerId(this.channelId)
+    if (scene === 'friend') {
+      resp = await this.bot.internal.sendPrivateMessage(peerId, this.segments)
+    } else if (scene === 'temp') {
+      resp = await this.bot.internal.sendPrivateMessage(peerId, this.segments)
     } else {
-      resp = await this.bot.internal.sendGroupMessage(+this.channelId, this.segments)
+      resp = await this.bot.internal.sendGroupMessage(peerId, this.segments)
     }
     const session = this.bot.session()
-    session.messageId = resp.message_seq.toString()
+    session.messageId = encodeMessageIdByScene(scene, peerId, resp.message_seq)
     session.timestamp = resp.time * 1000
     session.userId = this.session.selfId
     session.channelId = this.session.channelId
@@ -191,12 +191,17 @@ export class MilkyMessageEncoder<C extends Context = Context> extends MessageEnc
         await this.flush()
       }
     } else if (type === 'quote') {
-      this.segments.push({
-        type: 'reply',
-        data: {
-          message_seq: +attrs.id
-        }
-      })
+      const decoded = decodeMessageId(attrs.id)
+      if (decoded) {
+        this.segments.push({
+          type: 'reply',
+          data: {
+            message_seq: decoded.messageSeq
+          }
+        })
+      } else {
+        this.bot.logger.warn('Invalid quote id:', attrs.id)
+      }
     } else if (type === 'author') {
       Object.assign(this.stack[0].author, attrs)
     } else if (type === 'milky:light-app') {

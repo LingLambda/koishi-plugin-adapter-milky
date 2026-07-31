@@ -1,5 +1,5 @@
 import { Dict, HTTP } from 'koishi'
-import { CreateGroupFolderOutput, GetCookiesOutput, GetCSRFTokenOutput, GetCustomFaceUrlListOutput, GetForwardedMessagesOutput, GetFriendInfoOutput, GetFriendListOutput, GetFriendRequestsOutput, GetGroupAnnouncementsOutput, GetGroupEssenceMessagesOutput, GetGroupFileDownloadUrlOutput, GetGroupFilesOutput, GetGroupInfoOutput, GetGroupListOutput, GetGroupMemberInfoOutput, GetGroupMemberListOutput, GetGroupNotificationsOutput, GetHistoryMessagesOutput, GetImplInfoOutput, GetLoginInfoOutput, GetMessageOutput, GetPeerPinsOutput, GetPrivateFileDownloadUrlOutput, GetResourceTempUrlOutput, GetUserProfileOutput, OutgoingSegment, SendGroupMessageOutput, SendPrivateMessageOutput, UploadGroupFileOutput, UploadPrivateFileOutput } from '@saltify/milky-types'
+import { CreateGroupFolderOutput, GetCookiesOutput, GetCSRFTokenOutput, GetCustomFaceUrlListOutput, GetForwardedMessagesOutput, GetFriendInfoOutput, GetFriendListOutput, GetFriendRequestsOutput, GetGroupAnnouncementsOutput, GetGroupEssenceMessagesOutput, GetGroupFileDownloadUrlOutput, GetGroupFilesOutput, GetGroupInfoOutput, GetGroupListOutput, GetGroupMemberInfoOutput, GetGroupMemberListOutput, GetGroupNotificationsOutput, GetHistoryMessagesOutput, GetImplInfoOutput, GetLoginInfoOutput, GetMessageOutput, GetPeerPinsOutput, GetPrivateFileDownloadUrlOutput, GetResourceTempUrlOutput, GetUserProfileOutput, OutgoingSegment, SendGroupMessageOutput, SendPrivateMessageOutput, UploadGroupFileOutput, UploadPrivateFileOutput } from './generated/schema'
 
 interface ApiResponse<T = Dict> {
   status: 'ok' | 'failed'
@@ -296,8 +296,8 @@ export class Internal {
   }
 
   /** 获取私聊文件下载链接 */
-  async getPrivateFileDownloadUrl(user_id: number, file_id: string, file_hash: string) {
-    return await this.request<GetPrivateFileDownloadUrlOutput>('/api/get_private_file_download_url', { user_id, file_id, file_hash })
+  async getPrivateFileDownloadUrl(user_id: number, file_id: string, file_hash: string, is_self_send?: boolean) {
+    return await this.request<GetPrivateFileDownloadUrlOutput>('/api/get_private_file_download_url', { user_id, file_id, file_hash, is_self_send })
   }
 
   /** 获取群文件下载链接 */
@@ -323,6 +323,11 @@ export class Internal {
   /** 删除群文件 */
   async deleteGroupFile(group_id: number, file_id: string) {
     return await this.request<{}>('/api/delete_group_file', { group_id, file_id })
+  }
+
+  /** 转存群文件为永久文件 */
+  async persistGroupFile(group_id: number, file_id: string) {
+    return await this.request<{}>('/api/persist_group_file', { group_id, file_id })
   }
 
   /** 创建群文件夹 */

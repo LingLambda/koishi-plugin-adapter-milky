@@ -1,9 +1,10 @@
-import { Bot, Context, Schema, HTTP, Dict, Universal, isNonNullable } from 'koishi'
+import { Bot, Context, Schema, HTTP, Dict, Universal } from 'koishi'
 import { WsClient } from './ws'
 import { MilkyMessageEncoder } from './message'
-import { decodeFriend, decodeGroupChannel, decodeGuild, decodeGuildMember, decodeLoginUser, decodeMessage, decodePrivateChannel, decodeUser, filterNullable, getSceneAndPeerId } from './utils'
+import { decodeFriend, decodeGroupChannel, decodeGuild, decodeGuildMember, decodeLoginUser, decodeMessage, decodeMessageId, decodePrivateChannel, decodeUser, encodeMessageIdByScene, filterNullable, getSceneAndPeerId } from './utils'
 import { Internal } from './internal'
 import { Direction, Order } from '@satorijs/protocol'
+import { isNonNullable } from 'cosmokit'
 
 export class MilkyBot<C extends Context = Context> extends Bot<C, MilkyBot.Config> {
   static inject = {
@@ -15,7 +16,7 @@ export class MilkyBot<C extends Context = Context> extends Bot<C, MilkyBot.Confi
 
   constructor(ctx: C, config: MilkyBot.Config) {
     super(ctx, config, 'milky')
-    let headers: Dict
+    let headers: Dict | undefined
     if (config.token !== undefined && config.token !== '') {
       headers = {
         Authorization: `Bearer ${config.token}`,
@@ -138,43 +139,57 @@ export class MilkyBot<C extends Context = Context> extends Bot<C, MilkyBot.Confi
   }
 
   async getMessage(channelId: string, messageId: string) {
-    const [scene, peerId] = getSceneAndPeerId(channelId)
-    const data = await this.internal.getMessage(scene, peerId, +messageId)
+    const decoded = decodeMessageId(messageId)
+    if (!decoded) {
+      throw new Error(`Invalid message id: ${messageId}`)
+    }
+    const [scene] = getSceneAndPeerId(channelId)
+    const data = await this.internal.getMessage(scene, decoded.peerId, decoded.messageSeq)
     const message = await decodeMessage(this, data.message)
     if (!message) throw new Error('Message not found.')
     return message
   }
 
   async deleteMessage(channelId: string, messageId: string) {
-    const [scene, peerId] = getSceneAndPeerId(channelId)
-    if (scene === 'group') {
-      await this.internal.recallGroupMessage(peerId, +messageId)
+    const decoded = decodeMessageId(messageId)
+    if (!decoded) {
+      throw new Error(`Invalid message id: ${messageId}`)
+    }
+    if (decoded.isGroup) {
+      await this.internal.recallGroupMessage(decoded.peerId, decoded.messageSeq)
     } else {
-      await this.internal.recallPrivateMessage(peerId, +messageId)
+      await this.internal.recallPrivateMessage(decoded.peerId, decoded.messageSeq)
     }
   }
 
   async getMessageList(channelId: string, next?: string, direction: Direction = 'before', limit?: number, order?: Order) {
     if (direction !== 'before') throw new Error('Unsupported direction.')
     const [scene, peerId] = getSceneAndPeerId(channelId)
-    const { messages, next_message_seq } = await this.internal.getHistoryMessages(scene, peerId, next && +next, limit)
+    const { messages, next_message_seq } = await this.internal.getHistoryMessages(scene, peerId, next ? +next : undefined, limit)
+    const nextId = next_message_seq ? encodeMessageIdByScene(scene, peerId, next_message_seq) : undefined
     // 从旧到新
-    return { data: filterNullable(await Promise.all(messages.map(item => decodeMessage(this, item)))), next: String(next_message_seq) }
+    return { data: filterNullable(await Promise.all(messages.map(item => decodeMessage(this, item)))), next: nextId }
   }
 
   async createReaction(channelId: string, messageId: string, emojiId: string) {
-    const [scene, peerId] = getSceneAndPeerId(channelId)
-    if (scene === 'group') {
+    const decoded = decodeMessageId(messageId)
+    if (!decoded) {
+      throw new Error(`Invalid message id: ${messageId}`)
+    }
+    if (decoded.isGroup) {
       const [reactionType, reaction] = emojiId.split('|')
-      await this.internal.sendGroupMessageReaction(peerId, +messageId, reaction, reactionType as 'face' | 'emoji')
+      await this.internal.sendGroupMessageReaction(decoded.peerId, decoded.messageSeq, reaction, reactionType as 'face' | 'emoji')
     }
   }
 
   async deleteReaction(channelId: string, messageId: string, emojiId: string, userId?: string) {
-    const [scene, peerId] = getSceneAndPeerId(channelId)
-    if (scene === 'group') {
+    const decoded = decodeMessageId(messageId)
+    if (!decoded) {
+      throw new Error(`Invalid message id: ${messageId}`)
+    }
+    if (decoded.isGroup) {
       const [reactionType, reaction] = emojiId.split('|')
-      await this.internal.sendGroupMessageReaction(peerId, +messageId, reaction, reactionType as 'face' | 'emoji', false)
+      await this.internal.sendGroupMessageReaction(decoded.peerId, decoded.messageSeq, reaction, reactionType as 'face' | 'emoji', false)
     }
   }
 

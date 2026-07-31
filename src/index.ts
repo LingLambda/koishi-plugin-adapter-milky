@@ -1,6 +1,6 @@
 import { MilkyBot } from './bot'
 import { Internal } from './internal'
-import { Event } from '@saltify/milky-types'
+import { Event } from './generated/schema'
 import { Context } from 'koishi'
 
 export default MilkyBot

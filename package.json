@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-adapter-milky",
   "description": "Milky Protocol Adapter for Koishi",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -26,8 +26,12 @@
   "peerDependencies": {
     "koishi": "^4.18.11"
   },
+  "dependencies": {
+    "cosmokit": "^1.8.1",
+    "zod": "^4.4.3"
+  },
   "devDependencies": {
-    "@saltify/milky-types": "^1.2.0-rc.1"
+    "milkygen": "^0.3.3"
   },
   "koishi": {
     "browser": true,
